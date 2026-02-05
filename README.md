@@ -58,3 +58,7 @@ go build -o bin/server cmd/server/main.go
 # Run tests
 go test ./...
 ```
+
+![Screenshot 2026-02-05 at 20.16.03.png](../../../../var/folders/q5/x2zsxtkx22ddmcpn8f3xn4y40000gp/T/TemporaryItems/NSIRD_screencaptureui_x2yToe/Screenshot%202026-02-05%20at%2020.16.03.png)
+
+![Screenshot 2026-02-05 at 20.16.38.png](../../../../var/folders/q5/x2zsxtkx22ddmcpn8f3xn4y40000gp/T/TemporaryItems/NSIRD_screencaptureui_uePrnw/Screenshot%202026-02-05%20at%2020.16.38.png)
