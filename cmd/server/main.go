@@ -57,7 +57,7 @@ func main() {
 	cfg := config.Load()
 
 	log.Printf("🚀 Starting Stock Hub with %s database", cfg.DatabaseType)
-	log.Printf("📊 DSN: %s", cfg.GetDSN())
+	log.Printf("📊 DSN: %s", cfg.GetSafeDSN())
 
 	// Initialize message service with database type support
 	messageService, err := service.NewMessageService(

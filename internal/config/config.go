@@ -65,6 +65,21 @@ func (c *Config) GetDSN() string {
 	return c.DatabasePath
 }
 
+// GetSafeDSN returns the database connection string with password masked
+// This should be used for logging to avoid exposing credentials
+func (c *Config) GetSafeDSN() string {
+	if c.DatabaseType == "postgres" {
+		return fmt.Sprintf("host=%s port=%s user=%s password=*** dbname=%s sslmode=%s",
+			c.Postgres.Host,
+			c.Postgres.Port,
+			c.Postgres.User,
+			c.Postgres.DBName,
+			c.Postgres.SSLMode,
+		)
+	}
+	return c.DatabasePath
+}
+
 // GetDriver returns the database driver name
 func (c *Config) GetDriver() string {
 	if c.DatabaseType == "postgres" {
