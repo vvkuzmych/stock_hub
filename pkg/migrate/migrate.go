@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	_ "modernc.org/sqlite"
 )
 
 // Migration represents a database migration
@@ -33,11 +31,8 @@ func NewMigrator(db *sql.DB, migrationsDir string) *Migrator {
 		migrationsDir = "migrations"
 	}
 
-	// Determine placeholder based on migrations directory
-	placeholder := "?"
-	if migrationsDir == "migrations_postgres" {
-		placeholder = "$1"
-	}
+	// PostgreSQL uses $1 placeholder
+	placeholder := "$1"
 
 	return &Migrator{
 		db:            db,
@@ -126,7 +121,6 @@ func (m *Migrator) LoadMigrations() ([]Migration, error) {
 
 // ensureMigrationsTable creates the migrations tracking table if it doesn't exist
 func (m *Migrator) ensureMigrationsTable() error {
-	// PostgreSQL uses TIMESTAMP, SQLite uses DATETIME
 	query := `
 	CREATE TABLE IF NOT EXISTS schema_migrations (
 		version INTEGER PRIMARY KEY,

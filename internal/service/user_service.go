@@ -8,7 +8,6 @@ import (
 	"stock_hub/pkg/sqlutil"
 
 	_ "github.com/lib/pq"
-	_ "modernc.org/sqlite"
 )
 
 // UserService handles user operations
@@ -21,7 +20,7 @@ type UserService struct {
 func NewUserService(db *sql.DB) *UserService {
 	return &UserService{
 		db:     db,
-		driver: "sqlite", // default
+		driver: "postgres", // PostgreSQL only
 	}
 }
 
@@ -50,34 +49,13 @@ func (s *UserService) RegisterUser(username string) (*model.User, error) {
 		return nil, fmt.Errorf("failed to check user: %w", err)
 	}
 
-	// Create new user
+	// Create new user (PostgreSQL: use RETURNING to get ID)
 	insertQuery := sqlutil.ConvertPlaceholders("INSERT INTO users (username) VALUES (?)", s.driver)
-
-	if s.driver == "postgres" {
-		// PostgreSQL: use RETURNING to get ID
-		err = s.db.QueryRow(insertQuery+" RETURNING id", username).Scan(&user.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create user: %w", err)
-		}
-		user.Username = username
-		return &user, nil
-	}
-
-	// SQLite: use LastInsertId
-	result, err := s.db.Exec(insertQuery, username)
+	err = s.db.QueryRow(insertQuery+" RETURNING id", username).Scan(&user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user ID: %w", err)
-	}
-
-	user = model.User{
-		ID:       id,
-		Username: username,
-	}
+	user.Username = username
 	return &user, nil
 }
 

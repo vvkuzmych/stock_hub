@@ -11,7 +11,6 @@ import (
 	"stock_hub/pkg/migrate"
 
 	_ "github.com/lib/pq"
-	_ "modernc.org/sqlite"
 )
 
 func main() {
@@ -21,8 +20,8 @@ func main() {
 	)
 	flag.Parse()
 
-	// Load config with PostgreSQL support
-	cfg := config.LoadPostgres()
+	// Load config
+	cfg := config.Load()
 
 	// Get DSN and driver
 	dsn := cfg.GetDSN()
@@ -30,7 +29,7 @@ func main() {
 	migrationsDir := cfg.GetMigrationsDir()
 
 	// Override DSN if dbPath is provided
-	if *dbPath != "" && driver == "sqlite" {
+	if *dbPath != "" {
 		dsn = *dbPath
 	}
 

@@ -13,40 +13,40 @@ import (
 	gorillaWS "github.com/gorilla/websocket"
 )
 
-var upgraderPG = gorillaWS.Upgrader{
+var upgrader = gorillaWS.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true // Allow all origins in development
 	},
 }
 
-// WSMessagePG represents a WebSocket message
-type WSMessagePG struct {
+// WSMessage represents a WebSocket message
+type WSMessage struct {
 	Type     string          `json:"type"` // "register", "message", "order", "cancel_order"
 	Data     json.RawMessage `json:"data"`
 	Username string          `json:"username,omitempty"`
 	UserID   int64           `json:"user_id,omitempty"`
 }
 
-// RegisterDataPG for user registration
-type RegisterDataPG struct {
+// RegisterData for user registration
+type RegisterData struct {
 	Username string `json:"username"`
 }
 
-// OrderDataPG for stock orders
-type OrderDataPG struct {
+// OrderData for stock orders
+type OrderData struct {
 	Symbol    string  `json:"symbol"`
 	OrderType string  `json:"order_type"` // "bid" or "ask"
 	Price     float64 `json:"price"`
 	Quantity  int     `json:"quantity"`
 }
 
-// CancelOrderDataPG for cancelling orders
-type CancelOrderDataPG struct {
+// CancelOrderData for cancelling orders
+type CancelOrderData struct {
 	OrderID int64 `json:"order_id"`
 }
 
-type ServerContextPG struct {
-	messageService *service.MessageServicePostgres
+type ServerContext struct {
+	messageService *service.MessageService
 	userService    *service.UserService
 	orderService   *service.StockOrderService
 	hub            *ws.Hub
@@ -54,19 +54,19 @@ type ServerContextPG struct {
 }
 
 func main() {
-	cfg := config.LoadPostgres()
+	cfg := config.Load()
 
-	log.Printf("Starting Stock Hub with %s database", cfg.DatabaseType)
-	log.Printf("DSN: %s", cfg.GetDSN())
+	log.Printf("🚀 Starting Stock Hub with %s database", cfg.DatabaseType)
+	log.Printf("📊 DSN: %s", cfg.GetDSN())
 
 	// Initialize message service with database type support
-	messageService, err := service.NewMessageServicePostgres(
+	messageService, err := service.NewMessageService(
 		cfg.GetDriver(),
 		cfg.GetDSN(),
 		cfg.GetMigrationsDir(),
 	)
 	if err != nil {
-		log.Fatalf("Failed to initialize message service: %v", err)
+		log.Fatalf("❌ Failed to initialize message service: %v", err)
 	}
 	defer messageService.Close()
 
@@ -81,7 +81,7 @@ func main() {
 	hub := ws.NewHub(messageService)
 	go hub.Run()
 
-	ctx := &ServerContextPG{
+	ctx := &ServerContext{
 		messageService: messageService,
 		userService:    userService,
 		orderService:   orderService,
@@ -96,7 +96,7 @@ func main() {
 
 	// Register WebSocket handler
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		handleWebSocketPG(ctx, w, r)
+		handleWebSocket(ctx, w, r)
 	})
 
 	// Serve index.html for root and all other routes (SPA routing)
@@ -104,21 +104,19 @@ func main() {
 		if r.URL.Path == "/ws" {
 			return
 		}
-		// Serve index.html directly
 		http.ServeFile(w, r, "static/index.html")
 	})
 
-	log.Printf("🚀 Server starting on :%s", cfg.ServerPort)
 	log.Printf("🌐 Web interface: http://localhost:%s", cfg.ServerPort)
-	log.Printf("📊 Database: %s", cfg.DatabaseType)
+	log.Printf("🔌 WebSocket endpoint: ws://localhost:%s/ws", cfg.ServerPort)
 	if err := http.ListenAndServe(":"+cfg.ServerPort, mux); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
 }
 
-func handleWebSocketPG(ctx *ServerContextPG, w http.ResponseWriter, r *http.Request) {
+func handleWebSocket(ctx *ServerContext, w http.ResponseWriter, r *http.Request) {
 	log.Printf("WebSocket connection attempt from %s", r.RemoteAddr)
-	conn, err := upgraderPG.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
 		http.Error(w, "WebSocket upgrade failed", http.StatusBadRequest)
@@ -149,29 +147,29 @@ func handleWebSocketPG(ctx *ServerContextPG, w http.ResponseWriter, r *http.Requ
 				break
 			}
 
-			var msg WSMessagePG
+			var msg WSMessage
 			if err := json.Unmarshal(messageBytes, &msg); err != nil {
 				log.Printf("Failed to parse message: %v", err)
 				continue
 			}
 
-			handleMessagePG(ctx, client, &msg)
+			handleMessage(ctx, client, &msg)
 		}
 	}()
 }
 
-func handleMessagePG(ctx *ServerContextPG, client *ws.Client, msg *WSMessagePG) {
+func handleMessage(ctx *ServerContext, client *ws.Client, msg *WSMessage) {
 	switch msg.Type {
 	case "register":
-		var data RegisterDataPG
+		var data RegisterData
 		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			sendErrorPG(client, "Invalid registration data")
+			sendError(client, "Invalid registration data")
 			return
 		}
 
 		user, err := ctx.userService.RegisterUser(data.Username)
 		if err != nil {
-			sendErrorPG(client, "Failed to register user: "+err.Error())
+			sendError(client, "Failed to register user: "+err.Error())
 			return
 		}
 
@@ -183,7 +181,7 @@ func handleMessagePG(ctx *ServerContextPG, client *ws.Client, msg *WSMessagePG) 
 			"type": "registered",
 			"data": user,
 		}
-		sendJSONPG(client, response)
+		sendJSON(client, response)
 
 		// Send current open orders
 		orders, err := ctx.orderService.GetAllOpenOrders()
@@ -192,13 +190,13 @@ func handleMessagePG(ctx *ServerContextPG, client *ws.Client, msg *WSMessagePG) 
 				"type": "orders_update",
 				"data": orders,
 			}
-			sendJSONPG(client, response)
+			sendJSON(client, response)
 		}
 
 	case "message":
 		user := ctx.clientUsers[client]
 		if user == nil {
-			sendErrorPG(client, "Please register first")
+			sendError(client, "Please register first")
 			return
 		}
 
@@ -219,36 +217,36 @@ func handleMessagePG(ctx *ServerContextPG, client *ws.Client, msg *WSMessagePG) 
 		}
 
 		if content == "" {
-			sendErrorPG(client, "Invalid message format")
+			sendError(client, "Invalid message format")
 			return
 		}
 
 		// Save and broadcast message
 		ctx.messageService.SaveMessage(content, user.Username)
-		broadcastMessagePG(ctx, user.Username, content)
+		broadcastMessage(ctx, user.Username, content)
 
 	case "order":
 		user := ctx.clientUsers[client]
 		if user == nil {
-			sendErrorPG(client, "Please register first")
+			sendError(client, "Please register first")
 			return
 		}
 
-		var data OrderDataPG
+		var data OrderData
 		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			sendErrorPG(client, "Invalid order data")
+			sendError(client, "Invalid order data")
 			return
 		}
 
 		orderType := model.OrderType(data.OrderType)
 		if orderType != model.OrderTypeBid && orderType != model.OrderTypeAsk {
-			sendErrorPG(client, "Invalid order type")
+			sendError(client, "Invalid order type")
 			return
 		}
 
 		order, err := ctx.orderService.CreateOrder(user.ID, user.Username, data.Symbol, orderType, data.Price, data.Quantity)
 		if err != nil {
-			sendErrorPG(client, "Failed to create order: "+err.Error())
+			sendError(client, "Failed to create order: "+err.Error())
 			return
 		}
 
@@ -262,18 +260,18 @@ func handleMessagePG(ctx *ServerContextPG, client *ws.Client, msg *WSMessagePG) 
 	case "cancel_order":
 		user := ctx.clientUsers[client]
 		if user == nil {
-			sendErrorPG(client, "Please register first")
+			sendError(client, "Please register first")
 			return
 		}
 
-		var data CancelOrderDataPG
+		var data CancelOrderData
 		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			sendErrorPG(client, "Invalid cancel order data")
+			sendError(client, "Invalid cancel order data")
 			return
 		}
 
 		if err := ctx.orderService.CancelOrder(data.OrderID, user.ID); err != nil {
-			sendErrorPG(client, "Failed to cancel order: "+err.Error())
+			sendError(client, "Failed to cancel order: "+err.Error())
 			return
 		}
 
@@ -288,15 +286,15 @@ func handleMessagePG(ctx *ServerContextPG, client *ws.Client, msg *WSMessagePG) 
 	}
 }
 
-func sendErrorPG(client *ws.Client, message string) {
+func sendError(client *ws.Client, message string) {
 	response := map[string]interface{}{
 		"type": "error",
 		"data": message,
 	}
-	sendJSONPG(client, response)
+	sendJSON(client, response)
 }
 
-func sendJSONPG(client *ws.Client, data interface{}) {
+func sendJSON(client *ws.Client, data interface{}) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Printf("Failed to marshal response: %v", err)
@@ -305,7 +303,7 @@ func sendJSONPG(client *ws.Client, data interface{}) {
 	client.Send(jsonData)
 }
 
-func broadcastMessagePG(ctx *ServerContextPG, username, content string) {
+func broadcastMessage(ctx *ServerContext, username, content string) {
 	response := map[string]interface{}{
 		"type": "message",
 		"data": map[string]string{
