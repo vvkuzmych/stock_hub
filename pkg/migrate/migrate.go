@@ -30,10 +30,10 @@ func NewMigrator(db *sql.DB, migrationsDir string) *Migrator {
 	if migrationsDir == "" {
 		migrationsDir = "migrations"
 	}
-
+	
 	// PostgreSQL uses $1 placeholder
 	placeholder := "$1"
-
+	
 	return &Migrator{
 		db:            db,
 		migrationsDir: migrationsDir,
@@ -72,15 +72,26 @@ func (m *Migrator) LoadMigrations() ([]Migration, error) {
 		}
 
 		// Extract name and direction
-		ext := filepath.Ext(filename)
-		nameWithDir := strings.TrimSuffix(filename, ext)
-		dirParts := strings.Split(nameWithDir, ".")
+		// Example: 001_create_messages_table.up.sql
+		ext := filepath.Ext(filename)                    // .sql
+		nameWithDir := strings.TrimSuffix(filename, ext) // 001_create_messages_table.up
+		dirParts := strings.Split(nameWithDir, ".")      // [001_create_messages_table, up]
 		if len(dirParts) < 2 {
 			continue
 		}
 
-		direction := dirParts[len(dirParts)-1]
-		name := strings.Join(parts[1:len(parts)-1], "_")
+		direction := dirParts[len(dirParts)-1] // "up" or "down"
+		
+		// Extract migration name from base (without version prefix)
+		// dirParts[0] = "001_create_messages_table"
+		baseName := dirParts[0]
+		nameParts := strings.SplitN(baseName, "_", 2) // Split only on first underscore
+		var name string
+		if len(nameParts) > 1 {
+			name = nameParts[1] // "create_messages_table"
+		} else {
+			name = baseName // Fallback if no underscore found
+		}
 
 		// Read migration content
 		path := filepath.Join(m.migrationsDir, filename)

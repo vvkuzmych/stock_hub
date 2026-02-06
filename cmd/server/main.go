@@ -161,129 +161,157 @@ func handleWebSocket(ctx *ServerContext, w http.ResponseWriter, r *http.Request)
 func handleMessage(ctx *ServerContext, client *ws.Client, msg *WSMessage) {
 	switch msg.Type {
 	case "register":
-		var data RegisterData
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			sendError(client, "Invalid registration data")
+		if register(ctx, client, msg) {
 			return
-		}
-
-		user, err := ctx.userService.RegisterUser(data.Username)
-		if err != nil {
-			sendError(client, "Failed to register user: "+err.Error())
-			return
-		}
-
-		ctx.clientUsers[client] = user
-		client.ID = data.Username
-
-		// Send registration success
-		response := map[string]interface{}{
-			"type": "registered",
-			"data": user,
-		}
-		sendJSON(client, response)
-
-		// Send current open orders
-		orders, err := ctx.orderService.GetAllOpenOrders()
-		if err == nil {
-			response = map[string]interface{}{
-				"type": "orders_update",
-				"data": orders,
-			}
-			sendJSON(client, response)
 		}
 
 	case "message":
-		user := ctx.clientUsers[client]
-		if user == nil {
-			sendError(client, "Please register first")
+		if userMessage(ctx, client, msg) {
 			return
 		}
-
-		var content string
-		// Try to unmarshal as string first
-		if err := json.Unmarshal(msg.Data, &content); err != nil {
-			// Try as object with content field
-			var msgData map[string]string
-			if err := json.Unmarshal(msg.Data, &msgData); err == nil {
-				content = msgData["content"]
-			} else {
-				// Try as plain string (backward compatibility)
-				content = string(msg.Data)
-				if len(content) > 2 && content[0] == '"' && content[len(content)-1] == '"' {
-					content = content[1 : len(content)-1]
-				}
-			}
-		}
-
-		if content == "" {
-			sendError(client, "Invalid message format")
-			return
-		}
-
-		// Save and broadcast message
-		ctx.messageService.SaveMessage(content, user.Username)
-		broadcastMessage(ctx, user.Username, content)
 
 	case "order":
-		user := ctx.clientUsers[client]
-		if user == nil {
-			sendError(client, "Please register first")
+		if userOrder(ctx, client, msg) {
 			return
 		}
-
-		var data OrderData
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			sendError(client, "Invalid order data")
-			return
-		}
-
-		orderType := model.OrderType(data.OrderType)
-		if orderType != model.OrderTypeBid && orderType != model.OrderTypeAsk {
-			sendError(client, "Invalid order type")
-			return
-		}
-
-		order, err := ctx.orderService.CreateOrder(user.ID, user.Username, data.Symbol, orderType, data.Price, data.Quantity)
-		if err != nil {
-			sendError(client, "Failed to create order: "+err.Error())
-			return
-		}
-
-		// Broadcast order to all clients
-		response := map[string]interface{}{
-			"type": "order_created",
-			"data": order,
-		}
-		ctx.hub.BroadcastJSON(response)
 
 	case "cancel_order":
-		user := ctx.clientUsers[client]
-		if user == nil {
-			sendError(client, "Please register first")
+		if cancelOrder(ctx, client, msg) {
 			return
 		}
-
-		var data CancelOrderData
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			sendError(client, "Invalid cancel order data")
-			return
-		}
-
-		if err := ctx.orderService.CancelOrder(data.OrderID, user.ID); err != nil {
-			sendError(client, "Failed to cancel order: "+err.Error())
-			return
-		}
-
-		// Broadcast cancellation
-		response := map[string]interface{}{
-			"type": "order_cancelled",
-			"data": map[string]interface{}{
-				"order_id": data.OrderID,
-			},
-		}
-		ctx.hub.BroadcastJSON(response)
 	}
+}
+
+func register(ctx *ServerContext, client *ws.Client, msg *WSMessage) bool {
+	var data RegisterData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		sendError(client, "Invalid registration data")
+		return true
+	}
+
+	user, err := ctx.userService.RegisterUser(data.Username)
+	if err != nil {
+		sendError(client, "Failed to register user: "+err.Error())
+		return true
+	}
+
+	ctx.clientUsers[client] = user
+	client.ID = data.Username
+
+	// Send registration success
+	response := map[string]interface{}{
+		"type": "registered",
+		"data": user,
+	}
+	sendJSON(client, response)
+
+	// Send current open orders
+	orders, err := ctx.orderService.GetAllOpenOrders()
+	if err == nil {
+		response = map[string]interface{}{
+			"type": "orders_update",
+			"data": orders,
+		}
+		sendJSON(client, response)
+	}
+	return false
+}
+
+func cancelOrder(ctx *ServerContext, client *ws.Client, msg *WSMessage) bool {
+	user := ctx.clientUsers[client]
+	if user == nil {
+		sendError(client, "Please register first")
+		return true
+	}
+
+	var data CancelOrderData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		sendError(client, "Invalid cancel order data")
+		return true
+	}
+
+	if err := ctx.orderService.CancelOrder(data.OrderID, user.ID); err != nil {
+		sendError(client, "Failed to cancel order: "+err.Error())
+		return true
+	}
+
+	// Broadcast cancellation
+	response := map[string]interface{}{
+		"type": "order_cancelled",
+		"data": map[string]interface{}{
+			"order_id": data.OrderID,
+		},
+	}
+	ctx.hub.BroadcastJSON(response)
+	return false
+}
+
+func userOrder(ctx *ServerContext, client *ws.Client, msg *WSMessage) bool {
+	user := ctx.clientUsers[client]
+	if user == nil {
+		sendError(client, "Please register first")
+		return true
+	}
+
+	var data OrderData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		sendError(client, "Invalid order data")
+		return true
+	}
+
+	orderType := model.OrderType(data.OrderType)
+	if orderType != model.OrderTypeBid && orderType != model.OrderTypeAsk {
+		sendError(client, "Invalid order type")
+		return true
+	}
+
+	order, err := ctx.orderService.CreateOrder(user.ID, user.Username, data.Symbol, orderType, data.Price, data.Quantity)
+	if err != nil {
+		sendError(client, "Failed to create order: "+err.Error())
+		return true
+	}
+
+	// Broadcast order to all clients
+	response := map[string]interface{}{
+		"type": "order_created",
+		"data": order,
+	}
+	ctx.hub.BroadcastJSON(response)
+	return false
+}
+
+func userMessage(ctx *ServerContext, client *ws.Client, msg *WSMessage) bool {
+	user := ctx.clientUsers[client]
+	if user == nil {
+		sendError(client, "Please register first")
+		return true
+	}
+
+	var content string
+	// Try to unmarshal as string first
+	if err := json.Unmarshal(msg.Data, &content); err != nil {
+		// Try as object with content field
+		var msgData map[string]string
+		if err := json.Unmarshal(msg.Data, &msgData); err == nil {
+			content = msgData["content"]
+		} else {
+			// Try as plain string (backward compatibility)
+			content = string(msg.Data)
+			if len(content) > 2 && content[0] == '"' && content[len(content)-1] == '"' {
+				content = content[1 : len(content)-1]
+			}
+		}
+	}
+
+	if content == "" {
+		sendError(client, "Invalid message format")
+		return true
+	}
+
+	// Save and broadcast message
+	ctx.messageService.SaveMessage(content, user.Username)
+	broadcastMessage(ctx, user.Username, content)
+	return false
 }
 
 func sendError(client *ws.Client, message string) {
