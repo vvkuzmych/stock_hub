@@ -121,34 +121,6 @@ func NewClient(hub *Hub, conn *websocket.Conn, clientID string) *Client {
 	}
 }
 
-// ReadPump pumps messages from the WebSocket connection to the hub
-func (c *Client) ReadPump() {
-	defer func() {
-		c.hub.unregister <- c
-		c.conn.Close()
-	}()
-
-	for {
-		_, message, err := c.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
-			}
-			break
-		}
-
-		// Save message with client ID before broadcasting
-		if c.hub.messageLogger != nil {
-			if err := c.hub.messageLogger.SaveMessage(string(message), c.ID); err != nil {
-				log.Printf("Failed to save message from client %s: %v", c.ID, err)
-			}
-		}
-
-		// Broadcast message to all clients
-		c.hub.broadcast <- message
-	}
-}
-
 // WritePump pumps messages from the hub to the WebSocket connection
 func (c *Client) WritePump() {
 	defer c.conn.Close()
