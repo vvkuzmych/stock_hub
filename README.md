@@ -14,7 +14,8 @@ Stock Hub - це real-time платформа для торгівлі акція
 
 1. **Клонуйте репозиторій**
 ```bash
-cd /Users/vkuzm/GolandProjects/stock_hub
+git clone <repository-url>
+cd stock_hub
 ```
 
 2. **Встановіть залежності**

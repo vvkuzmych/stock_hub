@@ -7,7 +7,7 @@
 ## 📦 Крок 1: Встановити PostgreSQL драйвер
 
 ```bash
-cd /Users/vkuzm/GolandProjects/stock_hub
+cd stock_hub
 go get github.com/lib/pq
 go mod tidy
 ```

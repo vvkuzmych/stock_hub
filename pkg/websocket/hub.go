@@ -122,6 +122,7 @@ func NewClient(hub *Hub, conn *websocket.Conn, clientID string) *Client {
 }
 
 // WritePump pumps messages from the hub to the WebSocket connection
+// Each message is sent as a separate WebSocket frame to ensure valid JSON parsing
 func (c *Client) WritePump() {
 	defer c.conn.Close()
 
@@ -135,21 +136,8 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				c.mu.Unlock()
-				return
-			}
-			w.Write(message)
-
-			// Add queued messages
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
-			}
-
-			if err := w.Close(); err != nil {
+			// Send the message as a single WebSocket frame
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				c.mu.Unlock()
 				return
 			}
