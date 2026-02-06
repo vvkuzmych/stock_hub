@@ -241,9 +241,28 @@ func handleMessage(ctx *ServerContext, client *ws.Client, msg *WSMessage) {
 			return
 		}
 
+		// Validate order type
 		orderType := model.OrderType(data.OrderType)
 		if orderType != model.OrderTypeBid && orderType != model.OrderTypeAsk {
 			sendError(client, "Invalid order type")
+			return
+		}
+
+		// Validate price (must be positive)
+		if data.Price <= 0 {
+			sendError(client, "Price must be greater than 0")
+			return
+		}
+
+		// Validate quantity (must be positive)
+		if data.Quantity <= 0 {
+			sendError(client, "Quantity must be greater than 0")
+			return
+		}
+
+		// Validate symbol (not empty)
+		if data.Symbol == "" {
+			sendError(client, "Symbol cannot be empty")
 			return
 		}
 

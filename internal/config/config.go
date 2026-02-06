@@ -19,14 +19,14 @@ type DBConfig struct {
 type Config struct {
 	ServerPort    string
 	WebSocketPath string
-	DatabaseType  string // "sqlite" or "postgres"
-	DatabasePath  string // For SQLite
+	DatabaseType  string
+	DatabasePath  string
 	Postgres      DBConfig
 }
 
 // Load loads configuration from environment variables
 func Load() *Config {
-	dbType := getEnv("DB_TYPE", "postgres") // Default to PostgreSQL
+	dbType := getEnv("DB_TYPE", "postgres")
 
 	cfg := &Config{
 		ServerPort:    getEnv("SERVER_PORT", "8082"),

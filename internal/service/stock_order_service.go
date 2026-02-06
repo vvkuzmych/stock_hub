@@ -35,19 +35,33 @@ func NewStockOrderServiceWithDriver(db *sql.DB, driver string) *StockOrderServic
 
 // CreateOrder creates a new bid or ask order
 func (s *StockOrderService) CreateOrder(userID int64, username, symbol string, orderType model.OrderType, price float64, quantity int) (*model.StockOrder, error) {
+	// Validate input parameters
+	if price <= 0 {
+		return nil, fmt.Errorf("price must be greater than 0, got: %.2f", price)
+	}
+	if quantity <= 0 {
+		return nil, fmt.Errorf("quantity must be greater than 0, got: %d", quantity)
+	}
+	if symbol == "" {
+		return nil, fmt.Errorf("symbol cannot be empty")
+	}
+	if orderType != model.OrderTypeBid && orderType != model.OrderTypeAsk {
+		return nil, fmt.Errorf("invalid order type: %s", orderType)
+	}
+
 	query := `INSERT INTO stock_orders (user_id, username, symbol, order_type, price, quantity, status, created_at) 
 	          VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`
 	query = sqlutil.ConvertPlaceholders(query, s.driver)
-
+	
 	now := time.Now()
-
+	
 	// PostgreSQL: use RETURNING to get ID
 	var id int64
 	err := s.db.QueryRow(query+" RETURNING id", userID, username, symbol, string(orderType), price, quantity, now).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
-
+	
 	return &model.StockOrder{
 		ID:        id,
 		UserID:    userID,
@@ -71,7 +85,7 @@ func (s *StockOrderService) GetOpenOrders(symbol string) ([]*model.StockOrder, e
 	            CASE WHEN order_type = 'ask' THEN price END ASC,
 	            created_at ASC`
 	query = sqlutil.ConvertPlaceholders(query, s.driver)
-
+	
 	rows, err := s.db.Query(query, symbol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %w", err)
@@ -82,7 +96,7 @@ func (s *StockOrderService) GetOpenOrders(symbol string) ([]*model.StockOrder, e
 	for rows.Next() {
 		var order model.StockOrder
 		var orderTypeStr string
-		err := rows.Scan(&order.ID, &order.UserID, &order.Username, &order.Symbol,
+		err := rows.Scan(&order.ID, &order.UserID, &order.Username, &order.Symbol, 
 			&orderTypeStr, &order.Price, &order.Quantity, &order.Status, &order.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan order: %w", err)
@@ -103,7 +117,7 @@ func (s *StockOrderService) GetAllOpenOrders() ([]*model.StockOrder, error) {
 	            CASE WHEN order_type = 'bid' THEN price END DESC,
 	            CASE WHEN order_type = 'ask' THEN price END ASC,
 	            created_at ASC`
-
+	
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %w", err)
@@ -114,7 +128,7 @@ func (s *StockOrderService) GetAllOpenOrders() ([]*model.StockOrder, error) {
 	for rows.Next() {
 		var order model.StockOrder
 		var orderTypeStr string
-		err := rows.Scan(&order.ID, &order.UserID, &order.Username, &order.Symbol,
+		err := rows.Scan(&order.ID, &order.UserID, &order.Username, &order.Symbol, 
 			&orderTypeStr, &order.Price, &order.Quantity, &order.Status, &order.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan order: %w", err)
@@ -134,15 +148,15 @@ func (s *StockOrderService) CancelOrder(orderID, userID int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to cancel order: %w", err)
 	}
-
+	
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to check rows affected: %w", err)
 	}
-
+	
 	if rowsAffected == 0 {
 		return fmt.Errorf("order not found or already cancelled")
 	}
-
+	
 	return nil
 }
