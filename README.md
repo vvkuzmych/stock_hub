@@ -1,280 +1,304 @@
-# Stock Hub - Real-time Trading Platform 📊
+# Stock Hub - Monorepo 🚀
 
-Stock Hub - це real-time платформа для торгівлі акціями з підтримкою WebSocket з'єднань та PostgreSQL базою даних.
+Мікросервісна архітектура для trading платформи.
+
+---
+
+## 📁 Структура
+
+```
+stock_hub/
+├── go.work                          # Go workspace (monorepo)
+├── README.md                        # Цей файл
+│
+├── stock_hub_trade/                 # 📈 Trading Service
+│   ├── cmd/server/                  # Main HTTP/WebSocket/gRPC сервер
+│   ├── internal/                    # Business logic
+│   │   ├── service/                 # Domain services
+│   │   ├── repository/              # Data access layer
+│   │   ├── grpc/                    # gRPC server implementation
+│   │   ├── config/                  # Configuration
+│   │   └── handler/                 # HTTP handlers
+│   ├── pkg/                         # 🔥 SHARED DOMAIN MODELS
+│   │   ├── model/                   # User, StockOrder, Message
+│   │   ├── websocket/               # WebSocket utilities
+│   │   ├── migrate/                 # Database migrations
+│   │   └── sqlutil/                 # SQL helpers
+│   ├── api/proto/                   # gRPC Protobuf definitions
+│   ├── migrations/                  # SQL migration files
+│   ├── docs/                        # Documentation
+│   ├── go.mod
+│   └── README.md
+│
+└── stock_hub_email_service/         # 📧 Email Service
+    ├── cmd/server/                  # Main HTTP сервер
+    ├── internal/
+    │   ├── service/                 # Email sending logic
+    │   └── config/                  # Configuration
+    ├── go.mod                       # replace stock_hub_trade => ../stock_hub_trade
+    └── README.md
+```
+
+---
+
+## 🎯 Сервіси
+
+### 1️⃣ Stock Hub Trade (порт 8082, 50051)
+
+**Технології:**
+- HTTP/REST API
+- WebSocket (real-time trading)
+- gRPC (inter-service communication)
+- PostgreSQL
+
+**Endpoints:**
+```bash
+# HTTP
+http://localhost:8082/register
+http://localhost:8082/ws
+
+# gRPC
+grpc://localhost:50051
+```
+
+**RPC методи:**
+- `GetUser(user_id)` → User
+- `GetOrder(order_id)` → StockOrder
+- `GetOrders(user_id)` → []StockOrder
+- `GetMessages(limit)` → []Message
+
+---
+
+### 2️⃣ Email Service (порт 50052)
+
+**Технології:**
+- HTTP API
+- gRPC client (викликає stock_hub_trade)
+- SMTP (email sending)
+
+**Features:**
+- Welcome emails
+- Order confirmations
+- Order cancellations
+
+---
 
 ## 🚀 Швидкий старт
 
-### Попередні вимоги
+### Prerequisites
 
-- Go 1.25+
-- PostgreSQL 14+
-- Docker (опціонально, для легкого запуску PostgreSQL)
-
-### Встановлення
-
-1. **Клонуйте репозиторій**
 ```bash
-git clone <repository-url>
-cd stock_hub
+# Встановити protoc
+brew install protobuf
+
+# Встановити Go plugins
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 ```
 
-2. **Встановіть залежності**
+### Запуск
+
 ```bash
-make install-deps
-```
+# 1. Запустити PostgreSQL
+cd stock_hub_trade
+docker-compose up -d
 
-3. **Запустіть PostgreSQL**
-```bash
-# Варіант 1: Docker
-make docker-up
+# 2. Згенерувати proto файли (якщо змінювали)
+make proto-gen
 
-# Варіант 2: Локальна установка (потрібно встановити PostgreSQL окремо)
-# Створіть базу даних вручну:
-psql -U postgres -c "CREATE DATABASE stock_hub;"
-```
-
-4. **Налаштуйте середовище**
-```bash
-# Скопіюйте приклад .env
-cp .env.example .env
-
-# Відредагуйте .env при необхідності (за замовчуванням налаштовано для Docker)
-```
-
-5. **Застосуйте міграції**
-```bash
+# 3. Запустити міграції
 make migrate-up
-```
 
-6. **Запустіть сервер**
-```bash
+# 4. Запустити trading service
+make run-postgres
+
+# 5. В іншому терміналі запустити email service
+cd ../stock_hub_email_service
 make run
 ```
 
-Сервер буде доступний за адресою: http://localhost:8082
+---
 
-## 📦 Доступні команди
+## 🔧 Розробка
+
+### Go Workspace
+
+Проект використовує `go.work` для роботи з monorepo:
 
 ```bash
-make help           # Показати всі доступні команди
-make run            # Запустити сервер (PostgreSQL)
-make migrate-up     # Застосувати міграції
-make migrate-down   # Відкотити останню міграцію
-make docker-up      # Запустити PostgreSQL в Docker
-make docker-down    # Зупинити PostgreSQL
-make docker-logs    # Показати логи PostgreSQL
-make psql           # Підключитись до PostgreSQL
-make db-reset       # Повністю очистити БД та застосувати міграції
-make install-deps   # Встановити залежності
-make test           # Запустити тести
-make build          # Зібрати binary
-make clean          # Очистити тимчасові файли
+# Оновити dependencies
+go work sync
+
+# Запустити тести в усіх модулях
+go test ./...
+
+# Запустити тести в конкретному сервісі
+cd stock_hub_trade && go test ./...
 ```
 
-## 🗄️ База даних
+### Shared Models
 
-Проект використовує **PostgreSQL** як основну базу даних.
+Обидва сервіси використовують спільні моделі з `stock_hub_trade/pkg/model/`:
 
-### Структура таблиць
+```go
+// stock_hub_email_service/internal/service/email_service.go
+import "stock_hub_trade/pkg/model"  // ← Shared models!
 
-- **messages** - Повідомлення користувачів
-- **users** - Користувачі платформи
-- **stock_orders** - Заявки на купівлю/продаж акцій
-
-### Міграції
-
-Міграції знаходяться в директорії `migrations/`:
-
-```
-migrations/
-├── 001_create_messages_table.up.sql
-├── 001_create_messages_table.down.sql
-├── 002_create_users_table.up.sql
-├── 002_create_users_table.down.sql
-├── 003_create_stock_orders_table.up.sql
-└── 003_create_stock_orders_table.down.sql
+func (s *EmailService) SendWelcomeEmail(user *model.User) error {
+    // ...
+}
 ```
 
-## 🔧 Конфігурація
+### gRPC Communication
 
-Всі налаштування можна змінити через змінні середовища (`.env` файл):
+Email service викликає trading service через gRPC:
 
-```env
-# Server
-SERVER_PORT=8082
-WS_PATH=/ws
+```go
+// Email service → Trading service
+conn, _ := grpc.Dial("localhost:50051", grpc.WithInsecure())
+client := proto.NewStockHubServiceClient(conn)
+user, _ := client.GetUser(ctx, &proto.GetUserRequest{UserId: 1})
+```
 
-# Database (завжди PostgreSQL)
+---
+
+## 📚 Документація
+
+### Trading Service
+- `stock_hub_trade/README.md` - Повний опис
+- `stock_hub_trade/QUICKSTART.md` - Швидкий старт
+- `stock_hub_trade/docs/GRPC_SETUP.md` - gRPC setup
+- `stock_hub_trade/docs/REPOSITORY_PATTERN.md` - Архітектура
+- `stock_hub_trade/docs/REST_VS_GRPC_VS_WEBSOCKET.md` - Порівняння протоколів
+
+### Email Service
+- `stock_hub_email_service/README.md` - Повний опис
+
+---
+
+## 🧪 Тестування
+
+```bash
+# Всі тести
+go test ./...
+
+# Trading service
+cd stock_hub_trade
+go test ./internal/service/...
+go test ./internal/repository/...
+go test ./pkg/migrate/...
+
+# Email service
+cd stock_hub_email_service
+go test ./...
+```
+
+---
+
+## 🏗️ Архітектура
+
+### Clean Architecture Layers
+
+```
+┌─────────────────────────────────────────┐
+│         Frameworks & Drivers            │
+│  HTTP, gRPC, PostgreSQL, SMTP, WebSocket│
+└─────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────┐
+│        Interface Adapters               │
+│  Handlers, Repositories, Converters     │
+└─────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────┐
+│           Use Cases                     │
+│  Services (CreateOrder, SendEmail)      │
+└─────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────┐
+│            Entities                     │
+│  pkg/model (User, StockOrder, Message)  │
+└─────────────────────────────────────────┘
+```
+
+### Microservices Communication
+
+```
+User → stock_hub_trade:8082/register
+         ↓
+      [Create user in DB]
+         ↓
+      gRPC call → stock_hub_email_service:50052
+         ↓
+      gRPC client → stock_hub_trade:50051/GetUser
+         ↓
+      [Send welcome email via SMTP]
+```
+
+---
+
+## 🔐 Environment Variables
+
+### Trading Service (.env)
+```bash
 DB_TYPE=postgres
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=stock_hub
-POSTGRES_SSLMODE=disable
+SERVER_PORT=8082
+GRPC_PORT=50051
+WS_PATH=/ws
 ```
 
-## 🌐 API та WebSocket
-
-### WebSocket Endpoint
-```
-ws://localhost:8082/ws
-```
-
-### Типи повідомлень
-
-1. **Реєстрація користувача**
-```json
-{
-  "type": "register",
-  "data": {
-    "username": "john_doe"
-  }
-}
-```
-
-2. **Відправка повідомлення**
-```json
-{
-  "type": "message",
-  "data": "Hello, world!"
-}
-```
-
-3. **Створення заявки**
-```json
-{
-  "type": "order",
-  "data": {
-    "symbol": "AAPL",
-    "order_type": "bid",
-    "price": 150.50,
-    "quantity": 100
-  }
-}
-```
-
-4. **Скасування заявки**
-```json
-{
-  "type": "cancel_order",
-  "data": {
-    "order_id": 123
-  }
-}
-```
-
-## 📚 Документація
-
-### SQL Документація
-
-В директорії `docs/` є детальна SQL документація:
-
-- [`SQL_TOP_70_QUERIES.md`](./docs/SQL_TOP_70_QUERIES.md) - ТОП-70 найважливіших SQL запитів
-- [`SQL_STOCK_HUB_QUERIES.md`](./docs/SQL_STOCK_HUB_QUERIES.md) - Запити для цього проекту
-- [`SQL_ADMIN_MONITORING.md`](./docs/SQL_ADMIN_MONITORING.md) - Адміністрування та моніторинг
-- [`SQL_OPTIMIZATION_GUIDE.md`](./docs/SQL_OPTIMIZATION_GUIDE.md) - Оптимізація запитів
-- [`SQL_ADVANCED_EXAMPLES.md`](./docs/SQL_ADVANCED_EXAMPLES.md) - Просунуті приклади
-- [`SQL_README.md`](./docs/SQL_README.md) - Центральний README для всієї SQL документації
-
-### Налаштування та швидкий старт
-
-- [QUICKSTART.md](./QUICKSTART.md) - Швидкий старт за 3 хвилини
-- [POSTGRES_SETUP.md](./docs/POSTGRES_SETUP.md) - Детальне налаштування PostgreSQL
-- [CHANGELOG.md](./CHANGELOG.md) - Історія змін
-
-## 🛠️ Розробка
-
-### Структура проекту
-
-```
-stock_hub/
-├── cmd/
-│   ├── server/          # Головний сервер
-│   └── migrate/         # CLI для міграцій
-├── internal/
-│   ├── config/          # Конфігурація
-│   ├── model/           # Моделі даних
-│   └── service/         # Бізнес логіка
-├── pkg/
-│   ├── migrate/         # Система міграцій
-│   ├── sqlutil/         # SQL утиліти
-│   └── websocket/       # WebSocket hub
-├── migrations/          # SQL міграції
-└── static/              # Статичні файли (HTML, CSS, JS)
-```
-
-### Запуск тестів
-
+### Email Service (.env)
 ```bash
-make test
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+EMAIL_FROM=noreply@stockhub.com
+DATABASE_DSN=postgres://postgres:postgres@localhost:5432/stock_hub?sslmode=disable
+SERVER_PORT=50052
 ```
-
-### Збірка бінарника
-
-```bash
-make build
-# Бінарник буде в bin/stock_hub
-./bin/stock_hub
-```
-
-## 🐳 Docker
-
-Для легкого запуску PostgreSQL використовуйте Docker Compose:
-
-```bash
-# Запустити PostgreSQL
-make docker-up
-
-# Зупинити PostgreSQL
-make docker-down
-
-# Переглянути логи
-make docker-logs
-```
-
-## 🔍 Налагодження
-
-### Підключення до PostgreSQL
-
-```bash
-# З Makefile
-make psql
-
-# Або напряму
-psql -U postgres -d stock_hub
-```
-
-### Перезавантаження бази даних
-
-```bash
-# Повне очищення та повторне застосування міграцій
-make db-reset
-```
-
-### Перевірка таблиць
-
-```sql
-\dt                          # Список таблиць
-SELECT * FROM messages;      # Всі повідомлення
-SELECT * FROM users;         # Всі користувачі
-SELECT * FROM stock_orders;  # Всі заявки
-```
-
-## 📝 Файли конфігурації
-
-- [docker-compose.yml](./docker-compose.yml) - Docker конфігурація для PostgreSQL
-- [.env.example](./.env.example) - Приклад змінних середовища
-- [Makefile](./Makefile) - Команди для розробки
-
-## 🤝 Внесок
-
-Внески вітаються! Будь ласка, створюйте Pull Request або Issue.
-
-## 📄 Ліцензія
-
-MIT License
 
 ---
 
-Створено з ❤️ для навчання та практики Go + PostgreSQL + WebSockets
+## 📦 Dependencies
+
+### Trading Service
+- `github.com/gorilla/websocket` - WebSocket support
+- `github.com/lib/pq` - PostgreSQL driver
+- `google.golang.org/grpc` - gRPC framework
+- `google.golang.org/protobuf` - Protobuf support
+- `github.com/DATA-DOG/go-sqlmock` - SQL mocking for tests
+
+### Email Service
+- `github.com/lib/pq` - PostgreSQL driver (for fetching data)
+- `stock_hub_trade/pkg/model` - Shared domain models
+
+---
+
+## 🎓 Навчальні матеріали
+
+- [Clean Architecture vs MVVM](stock_hub_trade/docs/MICROSERVICES_ARCHITECTURE.md)
+- [Repository Pattern](stock_hub_trade/docs/REPOSITORY_PATTERN.md)
+- [Go Interfaces Explained](stock_hub_trade/docs/GO_INTERFACES_EXPLAINED.md)
+- [Table-Driven Tests](stock_hub_trade/docs/TABLE_DRIVEN_TESTS.md)
+- [gRPC Integration](stock_hub_trade/docs/GRPC_QUICKSTART.md)
+
+---
+
+## 🤝 Contribution
+
+1. Створити feature branch
+2. Написати тести
+3. Оновити документацію
+4. Створити PR
+
+---
+
+## 📝 License
+
+MIT
