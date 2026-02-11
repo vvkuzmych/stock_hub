@@ -31,6 +31,7 @@ type WSMessage struct {
 // RegisterData for user registration
 type RegisterData struct {
 	Username string `json:"username"`
+	Email    string `json:"email"` // User's email address
 }
 
 // OrderData for stock orders
@@ -179,7 +180,17 @@ func handleMessage(ctx *ServerContext, client *ws.Client, msg *WSMessage) {
 			return
 		}
 
-		user, err := ctx.userService.RegisterUser(data.Username)
+		// Validate required fields
+		if data.Username == "" {
+			sendError(client, "Username is required")
+			return
+		}
+		if data.Email == "" {
+			sendError(client, "Email is required")
+			return
+		}
+
+		user, err := ctx.userService.RegisterUser(data.Username, data.Email)
 		if err != nil {
 			sendError(client, "Failed to register user: "+err.Error())
 			return

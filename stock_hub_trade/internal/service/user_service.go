@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 
 	"stock_hub_trade/pkg/model"
 	"stock_hub_trade/pkg/sqlutil"
@@ -33,15 +34,35 @@ func NewUserServiceWithDriver(db *sql.DB, driver string) *UserService {
 }
 
 // RegisterUser creates a new user or returns existing one
-func (s *UserService) RegisterUser(username string) (*model.User, error) {
+func (s *UserService) RegisterUser(username, email string) (*model.User, error) {
+	// Validate username
+	if username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+
+	// Validate email
+	if email == "" {
+		return nil, fmt.Errorf("email is required")
+	}
+
+	// Simple email validation
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	if !emailRegex.MatchString(email) {
+		return nil, fmt.Errorf("invalid email format")
+	}
+
 	// Check if user exists
 	var user model.User
-	query := sqlutil.ConvertPlaceholders("SELECT id, username, created_at FROM users WHERE username = ?", s.driver)
+	var emailNull sql.NullString
+	query := sqlutil.ConvertPlaceholders("SELECT id, username, email, created_at FROM users WHERE username = ?", s.driver)
 	err := s.db.QueryRow(query, username).
-		Scan(&user.ID, &user.Username, &user.CreatedAt)
+		Scan(&user.ID, &user.Username, &emailNull, &user.CreatedAt)
 
 	if err == nil {
 		// User exists, return it
+		if emailNull.Valid {
+			user.Email = emailNull.String
+		}
 		return &user, nil
 	}
 
@@ -50,12 +71,15 @@ func (s *UserService) RegisterUser(username string) (*model.User, error) {
 	}
 
 	// Create new user (PostgreSQL: use RETURNING to get ID)
-	insertQuery := sqlutil.ConvertPlaceholders("INSERT INTO users (username) VALUES (?)", s.driver)
-	err = s.db.QueryRow(insertQuery+" RETURNING id", username).Scan(&user.ID)
+	insertQuery := sqlutil.ConvertPlaceholders("INSERT INTO users (username, email) VALUES (?, ?)", s.driver)
+	err = s.db.QueryRow(insertQuery+" RETURNING id, email", username, email).Scan(&user.ID, &emailNull)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 	user.Username = username
+	if emailNull.Valid {
+		user.Email = emailNull.String
+	}
 	return &user, nil
 }
 

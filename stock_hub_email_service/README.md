@@ -62,24 +62,45 @@ cp .env.example .env
 nano .env
 ```
 
-### 2. Run (Mock Mode - Recommended)
+### 2. Setup Email Provider
+
+**Option A: Ethereal Email (RECOMMENDED - 100% FREE!)** 🌟
 
 ```bash
-# .env should have:
-# MOCK_EMAIL=true
+# Auto-create free test account
+./setup_ethereal.sh
 
+# Copy credentials to .env (shown by script)
+nano .env
+```
+
+**Option B: Mock Mode (for quick dev)**
+
+```bash
+# .env
+MOCK_EMAIL=true
+```
+
+### 3. Run
+
+```bash
 make run
 ```
 
-**Output:**
+**Output (Ethereal):**
 ```
 📧 Starting Email Service
-⚠️  MOCK MODE ENABLED - Emails will NOT be sent
+SMTP: smtp.ethereal.email:587
 ✅ Database connected
 🌐 Email service running on http://localhost:8083
 ```
 
-### 3. Test
+**Output (Mock):**
+```
+⚠️  MOCK MODE ENABLED - Emails will NOT be sent
+```
+
+### 4. Test
 
 ```bash
 # Welcome email
@@ -87,11 +108,17 @@ curl -X POST http://localhost:8083/send \
   -H "Content-Type: application/json" \
   -d '{"type": "welcome", "user_id": 1}'
 
-# Order confirmation
-curl -X POST http://localhost:8083/send \
-  -H "Content-Type: application/json" \
-  -d '{"type": "order_confirmation", "order_id": 1}'
+# Expected: {"status":"sent"}
 ```
+
+### 5. View Email Online
+
+**If using Ethereal:**
+- Open https://ethereal.email/messages
+- See your email in browser! 📧
+
+**If using Mock Mode:**
+- Check terminal logs
 
 ---
 
@@ -120,9 +147,32 @@ FROM_NAME=Stock Hub
 
 ---
 
-## 📧 Mock Mode vs Real SMTP
+## 📧 Email Modes
 
-### Mock Mode (Development)
+### 1. Ethereal Email (Testing) 🌟 RECOMMENDED
+
+```bash
+# .env
+MOCK_EMAIL=false
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
+SMTP_USER=auto-generated@ethereal.email
+SMTP_PASSWORD=auto-generated-password
+```
+
+**Setup:**
+```bash
+./setup_ethereal.sh  # Auto-creates free account
+```
+
+**Behavior:**
+- ✅ **Emails sent to online inbox**
+- ✅ **View in browser**: https://ethereal.email/messages
+- ✅ **100% FREE, no limits**
+- ✅ **No registration needed**
+- ✅ **Perfect for testing**
+
+### 2. Mock Mode (Development)
 
 ```bash
 # .env
@@ -133,27 +183,25 @@ MOCK_EMAIL=true
 - Emails are **NOT actually sent**
 - Email content is **logged to console**
 - No SMTP credentials needed
+- Fastest for development
 
 **Example log:**
 ```
-📧 [MOCK] Email NOT actually sent (MOCK_EMAIL=true)
+📧 [MOCK] Email NOT actually sent
    To:      john@example.com
    Subject: Welcome to Stock Hub!
-   Body:
-   Hello john,
-   Welcome to Stock Hub! ...
    ✅ Mock email logged successfully
 ```
 
-### Real SMTP (Production)
+### 3. Real SMTP (Production)
 
 ```bash
-# .env
+# Gmail example
 MOCK_EMAIL=false
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-16-char-app-password
+SMTP_PASSWORD=your-app-password
 ```
 
 **Setup Gmail:**
@@ -162,8 +210,8 @@ SMTP_PASSWORD=your-16-char-app-password
 3. Use app password in `.env`
 
 **Behavior:**
-- Emails are **sent via SMTP**
-- Real emails delivered to recipients
+- Emails are **sent to real users**
+- Production use only
 
 ---
 
