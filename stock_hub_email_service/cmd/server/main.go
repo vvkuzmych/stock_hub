@@ -27,6 +27,9 @@ func main() {
 	log.Println("📧 Starting Email Service")
 	log.Printf("Server Port: %s", cfg.ServerPort)
 	log.Printf("SMTP: %s:%s", cfg.Email.SMTPHost, cfg.Email.SMTPPort)
+	if cfg.MockEmail {
+		log.Println("⚠️  MOCK MODE ENABLED - Emails will NOT be sent (MOCK_EMAIL=true)")
+	}
 
 	// Initialize email service
 	emailService := service.NewEmailService(
@@ -36,6 +39,7 @@ func main() {
 		cfg.Email.SMTPPassword,
 		cfg.Email.FromEmail,
 		cfg.Email.FromName,
+		cfg.MockEmail,
 	)
 
 	// Connect to database (to fetch users/orders)
@@ -132,10 +136,14 @@ func sendEmailHandler(emailService *service.EmailService, db *sql.DB) http.Handl
 // fetchUser retrieves user from database
 func fetchUser(db *sql.DB, userID int64) (*model.User, error) {
 	var user model.User
-	err := db.QueryRow("SELECT id, username, created_at FROM users WHERE id = $1", userID).
-		Scan(&user.ID, &user.Username, &user.CreatedAt)
+	var email sql.NullString
+	err := db.QueryRow("SELECT id, username, email, created_at FROM users WHERE id = $1", userID).
+		Scan(&user.ID, &user.Username, &email, &user.CreatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if email.Valid {
+		user.Email = email.String
 	}
 	return &user, nil
 }
