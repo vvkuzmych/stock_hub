@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package stock_hub;
+
+option go_package = "stock_hub/api/proto;proto";
+
+import "api/proto/model.proto";
+
+// StockHubService provides access to stock hub data
+service StockHubService {
+  // User operations
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
+  
+  // Order operations
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc GetOrders(GetOrdersRequest) returns (GetOrdersResponse);
+  rpc GetOrdersByUser(GetOrdersByUserRequest) returns (GetOrdersByUserResponse);
+  
+  // Message operations
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+  rpc GetMessagesByClient(GetMessagesByClientRequest) returns (GetMessagesByClientResponse);
+}
+
+// User requests/responses
+message GetUserRequest {
+  int64 user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message GetUsersRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message GetUsersResponse {
+  repeated User users = 1;
+}
+
+// Order requests/responses
+message GetOrderRequest {
+  int64 order_id = 1;
+}
+
+message GetOrderResponse {
+  StockOrder order = 1;
+}
+
+message GetOrdersRequest {
+  string symbol = 1;
+  string status = 2;  // "open", "filled", "cancelled"
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message GetOrdersResponse {
+  repeated StockOrder orders = 1;
+}
+
+message GetOrdersByUserRequest {
+  int64 user_id = 1;
+  int32 limit = 2;
+}
+
+message GetOrdersByUserResponse {
+  repeated StockOrder orders = 1;
+}
+
+// Message requests/responses
+message GetMessagesRequest {
+  int32 limit = 1;
+}
+
+message GetMessagesResponse {
+  repeated Message messages = 1;
+}
+
+message GetMessagesByClientRequest {
+  string client_id = 1;
+  int32 limit = 2;
+}
+
+message GetMessagesByClientResponse {
+  repeated Message messages = 1;
+}
