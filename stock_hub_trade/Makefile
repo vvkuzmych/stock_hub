@@ -1,4 +1,4 @@
-.PHONY: help run migrate-up migrate-down docker-up docker-down clean
+.PHONY: help run migrate-up migrate-down docker-up docker-down clean grpc-ui grpc-test
 
 help: ## Показати допомогу
 	@echo "Stock Hub - Available commands:"
@@ -77,5 +77,14 @@ db-reset: ## Повністю очистити PostgreSQL БД та застос
 	@echo "📊 Applying migrations..."
 	@make migrate-up
 	@echo "✅ Database ready!"
+
+grpc-ui: ## Відкрити gRPC Web UI в браузері
+	@./scripts/start_grpcui.sh
+
+grpc-test: ## Протестувати всі gRPC endpoints
+	@./scripts/test_grpc_endpoints.sh
+
+rest-test: ## Протестувати REST API Gateway
+	@./scripts/test_rest_gateway.sh
 
 .DEFAULT_GOAL := help

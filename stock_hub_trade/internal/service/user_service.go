@@ -86,11 +86,15 @@ func (s *UserService) RegisterUser(username, email string) (*model.User, error) 
 // GetUserByID retrieves a user by ID
 func (s *UserService) GetUserByID(id int64) (*model.User, error) {
 	var user model.User
-	query := sqlutil.ConvertPlaceholders("SELECT id, username, created_at FROM users WHERE id = ?", s.driver)
+	var emailNull sql.NullString
+	query := sqlutil.ConvertPlaceholders("SELECT id, username, email, created_at FROM users WHERE id = ?", s.driver)
 	err := s.db.QueryRow(query, id).
-		Scan(&user.ID, &user.Username, &user.CreatedAt)
+		Scan(&user.ID, &user.Username, &emailNull, &user.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	if emailNull.Valid {
+		user.Email = emailNull.String
 	}
 	return &user, nil
 }

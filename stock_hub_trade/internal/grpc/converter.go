@@ -1,9 +1,9 @@
 package grpc
 
 import (
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"stock_hub_trade/api/proto"
 	"stock_hub_trade/pkg/model"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ToProtoUser converts domain User to proto User
@@ -14,6 +14,7 @@ func ToProtoUser(user *model.User) *proto.User {
 	return &proto.User{
 		Id:        user.ID,
 		Username:  user.Username,
+		Email:     user.Email,
 		CreatedAt: timestamppb.New(user.CreatedAt),
 	}
 }
@@ -26,6 +27,7 @@ func FromProtoUser(protoUser *proto.User) *model.User {
 	return &model.User{
 		ID:        protoUser.Id,
 		Username:  protoUser.Username,
+		Email:     protoUser.Email,
 		CreatedAt: protoUser.CreatedAt.AsTime(),
 	}
 }
@@ -61,7 +63,7 @@ func ToProtoStockOrder(order *model.StockOrder) *proto.StockOrder {
 	if order == nil {
 		return nil
 	}
-	
+
 	var orderType proto.OrderType
 	switch order.OrderType {
 	case model.OrderTypeBid:
@@ -71,7 +73,7 @@ func ToProtoStockOrder(order *model.StockOrder) *proto.StockOrder {
 	default:
 		orderType = proto.OrderType_ORDER_TYPE_UNSPECIFIED
 	}
-	
+
 	return &proto.StockOrder{
 		Id:        order.ID,
 		UserId:    order.UserID,
@@ -90,7 +92,7 @@ func FromProtoStockOrder(protoOrder *proto.StockOrder) *model.StockOrder {
 	if protoOrder == nil {
 		return nil
 	}
-	
+
 	var orderType model.OrderType
 	switch protoOrder.OrderType {
 	case proto.OrderType_ORDER_TYPE_BID:
@@ -98,7 +100,7 @@ func FromProtoStockOrder(protoOrder *proto.StockOrder) *model.StockOrder {
 	case proto.OrderType_ORDER_TYPE_ASK:
 		orderType = model.OrderTypeAsk
 	}
-	
+
 	return &model.StockOrder{
 		ID:        protoOrder.Id,
 		UserID:    protoOrder.UserId,

@@ -47,30 +47,23 @@ else
     exit 1
 fi
 
-# 4. Get user from database and verify email
-echo -n "4️⃣  Getting user from DB... "
-USER_DATA=$(psql -U postgres -h localhost -d stock_hub -t -c "SELECT id, username, COALESCE(email, '') as email FROM users ORDER BY id LIMIT 1;" 2>/dev/null)
+# 4. Get user from database and ensure valid email
+echo -n "4️⃣  Preparing test user... "
 
-if [ -z "$USER_DATA" ]; then
-    echo -e "${RED}❌ No users found${NC}"
-    echo ""
-    echo "   Creating test user with real email..."
-    psql -U postgres -h localhost -d stock_hub -c "INSERT INTO users (username, email) VALUES ('test_user', 'test@stockhub.com');" > /dev/null 2>&1
-    USER_DATA=$(psql -U postgres -h localhost -d stock_hub -t -c "SELECT id, username, email FROM users WHERE username = 'test_user';")
+# Try to get user with valid email (contains @)
+USER_JSON=$(psql -U postgres -h localhost -d stock_hub -t -A -F'|' -c "SELECT id, username, email FROM users WHERE email LIKE '%@%' ORDER BY id LIMIT 1;" 2>/dev/null)
+
+if [ -z "$USER_JSON" ]; then
+    # No user with valid email, create one
+    psql -U postgres -h localhost -d stock_hub -c "INSERT INTO users (username, email) VALUES ('test_user', 'test_user@stockhub.com') ON CONFLICT (username) DO UPDATE SET email = 'test_user@stockhub.com';" > /dev/null 2>&1
+    USER_JSON=$(psql -U postgres -h localhost -d stock_hub -t -A -F'|' -c "SELECT id, username, email FROM users WHERE username = 'test_user';")
 fi
 
-USER_ID=$(echo "$USER_DATA" | awk '{print $1}' | tr -d ' ')
-USER_NAME=$(echo "$USER_DATA" | awk '{print $2}' | tr -d ' ')
-USER_EMAIL=$(echo "$USER_DATA" | awk '{print $3}' | tr -d ' ')
+USER_ID=$(echo "$USER_JSON" | cut -d'|' -f1 | tr -d ' ')
+USER_NAME=$(echo "$USER_JSON" | cut -d'|' -f2 | tr -d ' ')
+USER_EMAIL=$(echo "$USER_JSON" | cut -d'|' -f3 | tr -d ' ')
 
-# Validate email format (must contain @)
-if [ -z "$USER_EMAIL" ] || ! echo "$USER_EMAIL" | grep -q "@"; then
-    echo -e "${YELLOW}⚠️  Invalid email '$USER_EMAIL', fixing...${NC}"
-    USER_EMAIL="${USER_NAME}@stockhub.com"
-    psql -U postgres -h localhost -d stock_hub -c "UPDATE users SET email = '$USER_EMAIL' WHERE id = $USER_ID;" > /dev/null 2>&1
-fi
-
-echo -e "${GREEN}✅ ID=$USER_ID, Email=$USER_EMAIL${NC}"
+echo -e "${GREEN}✅ ID=$USER_ID, Name=$USER_NAME, Email=$USER_EMAIL${NC}"
 
 # 5. Clear Mailhog inbox
 echo -n "5️⃣  Clearing inbox... "
