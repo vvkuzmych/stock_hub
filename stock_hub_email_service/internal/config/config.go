@@ -19,6 +19,9 @@ type Config struct {
 	
 	// Database connection (to fetch users/orders)
 	DatabaseDSN string
+	
+	// Mock mode (for development)
+	MockEmail bool
 }
 
 // Load loads configuration from environment variables
@@ -34,6 +37,7 @@ func Load() *Config {
 			FromName:     getEnv("FROM_NAME", "Stock Hub"),
 		},
 		DatabaseDSN: getEnv("DATABASE_DSN", "host=localhost port=5432 user=postgres password=postgres dbname=stock_hub sslmode=disable"),
+		MockEmail:   getEnv("MOCK_EMAIL", "false") == "true",
 	}
 }
 

@@ -1,0 +1,42 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+server
+server_new
+test_server
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Environment files - NEVER COMMIT!
+.env
+*.env
+!.env.example
+
+# Credentials
+ethereal_credentials.txt
+*credentials*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

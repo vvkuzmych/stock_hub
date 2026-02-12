@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
 
@@ -178,6 +179,11 @@ func NewGRPCServer(
 ) (*grpc.Server, error) {
 	grpcServer := grpc.NewServer()
 	RegisterServer(grpcServer, userService, orderService, messageService)
+
+	// Register reflection service for development/testing
+	// Allows tools like Kreya and grpcurl to discover methods automatically
+	reflection.Register(grpcServer)
+
 	return grpcServer, nil
 }
 

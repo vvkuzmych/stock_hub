@@ -1,6 +1,6 @@
 go 1.25
 
 use (
-	./stock_hub_trade
 	./stock_hub_email_service
+	./stock_hub_trade
 )
